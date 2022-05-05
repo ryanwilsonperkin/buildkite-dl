@@ -144,14 +144,23 @@ yargs
         default: false,
         desc: "Only list failed tests",
       },
+      sort: {
+        boolean: true,
+        default: true,
+        desc: "Sort the results alphabetically",
+      },
     },
-    async ({ jobUrl, failuresOnly }) => {
+    async ({ jobUrl, failuresOnly, sort }) => {
       const artifactContents = await fetchArtifactContents(jobUrl);
       const testNames = artifactContents.flatMap((junit) =>
         extractTestNames(junit, failuresOnly)
       );
 
-      testNames.sort().forEach((name) => console.log(name));
+      if (sort) {
+          testNames.sort();
+      }
+
+      testNames.forEach((name) => console.log(name));
     }
   )
   .help().argv;

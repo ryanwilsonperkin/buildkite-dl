@@ -1,0 +1,11 @@
+{
+  "name": "buildkite-dl",
+  "version": "1.0.0",
+  "description": "Download Junit.xml artifacts from buildkite and analyze them",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.10",
+    "node-fetch": "^2"
+  }
+}

@@ -4,6 +4,7 @@ const exec = util.promisify(require("child_process").exec);
 
 const cheerio = require("cheerio");
 const fetch = require("node-fetch");
+const yargs = require("yargs");
 
 const { BUILDKITE_API_TOKEN } = process.env;
 if (!BUILDKITE_API_TOKEN) {
@@ -128,18 +129,21 @@ async function fetchArtifactContents(jobUrl) {
   });
 }
 
-async function main() {
-  const jobUrl = process.argv[2];
-  if (!jobUrl) {
-    throw new Error("usage: node index.js BUILDKITE_JOB_URL");
-  }
+yargs
+  .scriptName("buildkite-dl")
+  .command(
+    "$0 <jobUrl>",
+    "list tests from a CI job",
+    {
+        
+    },
+    async ({ jobUrl }) => {
+      const artifactContents = await fetchArtifactContents(jobUrl);
+      const testNames = artifactContents.flatMap((junit) =>
+        extractTestNames(junit)
+      );
 
-  const artifactContents = await fetchArtifactContents(jobUrl);
-  const testNames = artifactContents.flatMap((junit) =>
-    extractTestNames(junit)
-  );
-
-  testNames.sort().forEach((name) => console.log(name));
-}
-
-main();
+      testNames.sort().forEach((name) => console.log(name));
+    }
+  )
+  .help().argv;

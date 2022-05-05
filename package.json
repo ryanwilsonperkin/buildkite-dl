@@ -4,7 +4,7 @@
   "description": "Download Junit.xml artifacts from buildkite and analyze them",
   "main": "index.js",
   "bin": {
-    "buildkite-dl": "index.js"
+    "buildkite-dl": "./bin/buildkite-dl"
   },
   "license": "MIT",
   "dependencies": {

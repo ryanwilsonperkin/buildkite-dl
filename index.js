@@ -8,7 +8,7 @@ const yargs = require("yargs");
 
 const { BUILDKITE_API_TOKEN } = process.env;
 if (!BUILDKITE_API_TOKEN) {
-  throw new Error("Missing required env var BUILDKITE_API_TOKEN");
+  throw new Error("Missing required env var BUILDKITE_API_TOKEN, see README");
 }
 
 const MAX_ARTIFACT_SIZE = 1024 * 1024 * 4; // Arbitrary 4Mb max size on artifacts

@@ -82,11 +82,15 @@ async function fetchContent(storageUrl) {
 /**
  * Find a list of test names from a Junit document
  * @param {string} junit
+ * @param {boolean} failuresOnly
  * @returns {string[]}
  */
-function extractTestNames(junit) {
+function extractTestNames(junit, failuresOnly) {
   const $ = cheerio.load(junit);
-  return $("testsuites > testsuite > testcase")
+  const query = failuresOnly
+    ? "testsuites > testsuite > testcase:has(failure)"
+    : "testsuites > testsuite > testcase";
+  return $(query)
     .toArray()
     .map((node) => node.attribs.classname);
 }
@@ -135,12 +139,16 @@ yargs
     "$0 <jobUrl>",
     "list tests from a CI job",
     {
-        
+      failuresOnly: {
+        boolean: true,
+        default: false,
+        desc: "Only list failed tests",
+      },
     },
-    async ({ jobUrl }) => {
+    async ({ jobUrl, failuresOnly }) => {
       const artifactContents = await fetchArtifactContents(jobUrl);
       const testNames = artifactContents.flatMap((junit) =>
-        extractTestNames(junit)
+        extractTestNames(junit, failuresOnly)
       );
 
       testNames.sort().forEach((name) => console.log(name));

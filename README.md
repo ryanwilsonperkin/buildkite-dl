@@ -14,11 +14,11 @@ the GCS organization where your Buildkite is configured to host artifacts.
 
 ``` sh
 # List all junit tests from https://buildkite.com/my-org/my-pipeline/builds/12345
-npx github:ryanwilsonperkin/buildkite-dl https://buildkite.com/my-org/my-pipeline/builds/12345
+npx buildkite-dl https://buildkite.com/my-org/my-pipeline/builds/12345
 
 # List only the failed tests
-npx github:ryanwilsonperkin/buildkite-dl --failures-only https://buildkite.com/my-org/my-pipeline/builds/12345
+npx buildkite-dl --failures-only https://buildkite.com/my-org/my-pipeline/builds/12345
 
 # Full list of options
-npx github:ryanwilsonperkin/buildkite-dl --help
+npx buildkite-dl --help
 ```

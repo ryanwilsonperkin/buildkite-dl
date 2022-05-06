@@ -15,6 +15,7 @@ if (!BUILDKITE_API_TOKEN) {
 const MAX_ARTIFACT_SIZE = 1024 * 1024 * 4; // Arbitrary 4Mb max size on artifacts
 
 /** @typedef {{job_id: string, filename: string, download_url: string}} Artifact */
+/** @typedef {typeof console.error} Logger */
 
 /**
  * Parse a job URL like https://buildkite.com/my-org/my-pipeline/builds/430653
@@ -34,14 +35,16 @@ function parseJobUrl(jobUrl) {
  * Fetch a list of artifacts for a given job
  * Focuses only on junit.xml artifacts
  * @param {string} jobUrl
+ * @param {Logger} logger
  * @returns {Promise<Artifact[]>}
  */
-async function fetchListOfArtifacts(jobUrl) {
+async function fetchListOfArtifacts(jobUrl, logger) {
   const { orgSlug, pipelineSlug, buildNumber } = parseJobUrl(jobUrl);
   const results = [];
   let url = `https://api.buildkite.com//v2/organizations/${orgSlug}/pipelines/${pipelineSlug}/builds/${buildNumber}/artifacts?per_page=100`;
 
   do {
+    logger(`Fetching list of artifacts: ${url}`);
     let pageResponse = await fetch(url, { headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` } });
     let pageResults = await pageResponse.json();
 
@@ -55,10 +58,13 @@ async function fetchListOfArtifacts(jobUrl) {
 /**
  * Finds the "storage URL" of an artifact, which is the google cloud resource it can be downloaded from
  * @param {Artifact} artifact
+ * @param {Logger} logger
  * @returns {Promise<string>}
  */
-async function fetchStorageUrl(artifact) {
-  const resp = await fetch(artifact.download_url, {
+async function fetchStorageUrl(artifact, logger) {
+  const url = artifact.download_url;
+  logger(`Fetching storage url: ${url}`);
+  const resp = await fetch(url, {
     redirect: "manual", // Don't follow the redirect, results in a Google Cloud login page
     headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` },
   });
@@ -69,9 +75,11 @@ async function fetchStorageUrl(artifact) {
 /**
  * Fetch content from a storage URL
  * @param {Artifact} artifact
+ * @param {Logger} logger
  * @returns {Promise<string>}
  */
-async function fetchContent(storageUrl) {
+async function fetchContent(storageUrl, logger) {
+  logger(`Fetching content: ${storageUrl}`);
   const gsIdentifier = new URL(storageUrl).pathname.slice(1);
   try {
     const { stdout } = await exec(`gsutil cat gs://${gsIdentifier}`, {
@@ -103,18 +111,33 @@ function extractTestNames(junit, failuresOnly) {
 }
 
 /**
+ * Write results to the cache file as JSON
+ * @param {string} cacheFile
+ * @param {string[]} result
+ * @param {Logger} logger
+ */
+async function writeCache(cacheFile, result, logger) {
+  await fs.promises.writeFile(cacheFile, JSON.stringify(result));
+  logger(`Wrote cache results: ${cacheFile}`);
+}
+
+/**
  * Use a JSON file as a cache, return the content of the cache if present, or fn() if not
  * @template {Function} T
  * @param {string} cacheKey
  * @param {T} fn
+ * @param {Logger} logger
  * @returns {ReturnType<T>}
  */
-async function withJsonCache(cacheFile, fn) {
+async function withJsonCache(cacheFile, fn, logger) {
   try {
-    return JSON.parse(await fs.promises.readFile(cacheFile));
+    const result = JSON.parse(await fs.promises.readFile(cacheFile));
+    logger(`Read from cache: ${cacheFile}`);
+    return result;
   } catch (e) {
+    logger(`No cache found: ${cacheFile}`);
     const result = await fn();
-    fs.promises.writeFile(cacheFile, JSON.stringify(result));
+    writeCache(cacheFile, result, logger);
     return result;
   }
 }
@@ -123,27 +146,30 @@ async function withJsonCache(cacheFile, fn) {
  * Fetch all artifacts from a given job URL, leveraging a cache to avoid re-downloading
  * @param {string} jobUrl
  * @param {boolean} cache
+ * @param {Logger} logger
  * @returns {Promise<string[]>}
  */
-async function fetchArtifactContents(jobUrl, cache) {
+async function fetchArtifactContents(jobUrl, cache, logger) {
   const cacheKey = jobUrl.replace(/[/:]/g, "_");
   const cacheFile = `/tmp/${cacheKey}`;
 
   const fetcher = async () => {
-    const artifacts = await fetchListOfArtifacts(jobUrl);
+    const artifacts = await fetchListOfArtifacts(jobUrl, logger);
     return Promise.all(
       artifacts.map(async (artifact) => {
-        const storageUrl = await fetchStorageUrl(artifact);
-        const content = await fetchContent(storageUrl);
+        const storageUrl = await fetchStorageUrl(artifact, logger);
+        const content = await fetchContent(storageUrl, logger);
         return content;
       })
     );
   }
 
   if (cache) {
-    return withJsonCache(cacheFile, fetcher);
+    return withJsonCache(cacheFile, fetcher, logger);
   } else {
-    return fetcher();
+    const result = await fetcher();
+    writeCache(cacheFile, result, logger);
+    return result;
   }
 }
 
@@ -167,10 +193,16 @@ yargs
         boolean: true,
         default: true,
         desc: "Read artifacts from local cache if present",
-      }
+      },
+      verbose: {
+        boolean: true,
+        default: false,
+        desc: "Enable logging",
+      },
     },
-    async ({ jobUrl, failuresOnly, sort, cache }) => {
-      const artifactContents = await fetchArtifactContents(jobUrl, cache);
+    async ({ jobUrl, failuresOnly, sort, cache, verbose }) => {
+      const logger = verbose ? console.error : () => {};
+      const artifactContents = await fetchArtifactContents(jobUrl, cache, logger);
       const testNames = artifactContents.flatMap((junit) =>
         extractTestNames(junit, failuresOnly)
       );

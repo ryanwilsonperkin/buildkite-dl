@@ -115,13 +115,14 @@ async function withJsonCache(cacheFile, fn) {
 /**
  * Fetch all artifacts from a given job URL, leveraging a cache to avoid re-downloading
  * @param {string} jobUrl
+ * @param {boolean} cache
  * @returns {Promise<string[]>}
  */
-async function fetchArtifactContents(jobUrl) {
+async function fetchArtifactContents(jobUrl, cache) {
   const cacheKey = jobUrl.replace(/[/:]/g, "_");
   const cacheFile = `/tmp/${cacheKey}`;
 
-  return withJsonCache(cacheFile, async () => {
+  const fetcher = async () => {
     const artifacts = await fetchListOfArtifacts(jobUrl);
     return Promise.all(
       artifacts.map(async (artifact) => {
@@ -130,7 +131,13 @@ async function fetchArtifactContents(jobUrl) {
         return content;
       })
     );
-  });
+  }
+
+  if (cache) {
+    return withJsonCache(cacheFile, fetcher);
+  } else {
+    return fetcher();
+  }
 }
 
 yargs
@@ -149,9 +156,14 @@ yargs
         default: true,
         desc: "Sort the results alphabetically",
       },
+      cache: {
+        boolean: true,
+        default: true,
+        desc: "Read artifacts from local cache if present",
+      }
     },
-    async ({ jobUrl, failuresOnly, sort }) => {
-      const artifactContents = await fetchArtifactContents(jobUrl);
+    async ({ jobUrl, failuresOnly, sort, cache }) => {
+      const artifactContents = await fetchArtifactContents(jobUrl, cache);
       const testNames = artifactContents.flatMap((junit) =>
         extractTestNames(junit, failuresOnly)
       );

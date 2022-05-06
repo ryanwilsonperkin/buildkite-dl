@@ -4,6 +4,7 @@ const exec = util.promisify(require("child_process").exec);
 
 const cheerio = require("cheerio");
 const fetch = require("node-fetch");
+const parseLinkHeader = require("parse-link-header");
 const yargs = require("yargs");
 
 const { BUILDKITE_API_TOKEN } = process.env;
@@ -37,12 +38,18 @@ function parseJobUrl(jobUrl) {
  */
 async function fetchListOfArtifacts(jobUrl) {
   const { orgSlug, pipelineSlug, buildNumber } = parseJobUrl(jobUrl);
-  const resp = await fetch(
-    `https://api.buildkite.com//v2/organizations/${orgSlug}/pipelines/${pipelineSlug}/builds/${buildNumber}/artifacts?per_page=100`,
-    { headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` } }
-  );
-  const data = await resp.json();
-  return data.filter((artifact) => artifact.filename === "junit.xml");
+  const results = [];
+  let url = `https://api.buildkite.com//v2/organizations/${orgSlug}/pipelines/${pipelineSlug}/builds/${buildNumber}/artifacts?per_page=100`;
+
+  do {
+    let pageResponse = await fetch(url, { headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` } });
+    let pageResults = await pageResponse.json();
+
+    results.push(...pageResults);
+    url = parseLinkHeader(pageResponse.headers.get("Link"))?.next?.url;
+  } while (url);
+
+  return results.filter((artifact) => artifact.filename === "junit.xml");
 }
 
 /**

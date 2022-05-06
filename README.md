@@ -10,6 +10,24 @@ You'll also need to create a [Buildkite API token](https://buildkite.com/user/ap
 
 ## Usage
 
+```
+buildkite-dl <jobUrl>
+
+list tests from a CI job
+
+Options:
+  --version       Show version number                                  [boolean]
+  --help          Show help                                            [boolean]
+  --failuresOnly  Only list failed tests              [boolean] [default: false]
+  --sort          Sort the results alphabetically      [boolean] [default: true]
+  --cache         Read artifacts from local cache if present
+                                                       [boolean] [default: true]
+  --verbose       Enable logging                      [boolean] [default: false]
+```
+
+
+## Examples
+
 ``` sh
 export BUILDKITE_API_TOKEN=<your buildkite api token>
 

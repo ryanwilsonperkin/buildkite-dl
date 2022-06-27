@@ -45,7 +45,9 @@ async function fetchListOfArtifacts(jobUrl, logger) {
 
   do {
     logger(`Fetching list of artifacts: ${url}`);
-    let pageResponse = await fetch(url, { headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` } });
+    let pageResponse = await fetch(url, {
+      headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` },
+    });
     let pageResults = await pageResponse.json();
 
     results.push(...pageResults);
@@ -167,7 +169,7 @@ async function fetchArtifactContents(jobUrl, cache, logger) {
         return content;
       })
     );
-  }
+  };
 
   if (cache) {
     return withJsonCache(cacheFile, fetcher, logger);

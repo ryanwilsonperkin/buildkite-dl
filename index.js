@@ -45,7 +45,9 @@ async function fetchListOfArtifacts(jobUrl, logger) {
 
   do {
     logger(`Fetching list of artifacts: ${url}`);
-    let pageResponse = await fetch(url, { headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` } });
+    let pageResponse = await fetch(url, {
+      headers: { Authorization: `Bearer ${BUILDKITE_API_TOKEN}` },
+    });
     let pageResults = await pageResponse.json();
 
     results.push(...pageResults);
@@ -155,6 +157,11 @@ async function fetchArtifactContents(jobUrl, cache, logger) {
 
   const fetcher = async () => {
     const artifacts = await fetchListOfArtifacts(jobUrl, logger);
+    if (artifacts.length === 0) {
+      throw new Error(
+        "No junit.xml artifact files were found in this build, your pipeline must be configured to emit junit.xml artifacts"
+      );
+    }
     return Promise.all(
       artifacts.map(async (artifact) => {
         const storageUrl = await fetchStorageUrl(artifact, logger);
@@ -162,7 +169,7 @@ async function fetchArtifactContents(jobUrl, cache, logger) {
         return content;
       })
     );
-  }
+  };
 
   if (cache) {
     return withJsonCache(cacheFile, fetcher, logger);
@@ -202,16 +209,25 @@ yargs
     },
     async ({ jobUrl, failuresOnly, sort, cache, verbose }) => {
       const logger = verbose ? console.error : () => {};
-      const artifactContents = await fetchArtifactContents(jobUrl, cache, logger);
-      const testNames = artifactContents.flatMap((junit) =>
-        extractTestNames(junit, failuresOnly)
-      );
+      try {
+        const artifactContents = await fetchArtifactContents(
+          jobUrl,
+          cache,
+          logger
+        );
+        const testNames = artifactContents.flatMap((junit) =>
+          extractTestNames(junit, failuresOnly)
+        );
 
-      if (sort) {
+        if (sort) {
           testNames.sort();
-      }
+        }
 
-      testNames.forEach((name) => console.log(name));
+        testNames.forEach((name) => console.log(name));
+      } catch (error) {
+        console.error(error.message || error);
+        process.exit(1);
+      }
     }
   )
   .help().argv;

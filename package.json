@@ -1,6 +1,6 @@
 {
   "name": "buildkite-dl",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Download Junit.xml artifacts from buildkite and analyze them",
   "main": "index.js",
   "bin": {
